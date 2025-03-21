@@ -1,0 +1,8 @@
+FROM python:latest
+
+ADD producer.py ./
+
+RUN pip install --no-cache-dir pika 
+
+CMD ["python","./producer.py"]
+#注意这是不一样的命令，关于path

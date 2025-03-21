@@ -1,0 +1,7 @@
+FROM python:latest
+
+ADD drawplot.py ./
+
+RUN pip install --no-cache-dir uproot awkward vector numpy matplotlib
+
+CMD ["python","./drawplot.py"]

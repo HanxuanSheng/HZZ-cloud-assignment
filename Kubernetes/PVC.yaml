@@ -1,0 +1,25 @@
+# PersistentVolumeClaim for shared_analysis_data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-analysis-data
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: hostpath
+---
+# PersistentVolumeClaim for plot storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-plot
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: hostpath

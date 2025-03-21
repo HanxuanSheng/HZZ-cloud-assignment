@@ -1,0 +1,71 @@
+version: "3.8"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  producer:
+    image: producer
+    command: [ "python3", "/producer.py", "https://atlas-opendata.web.cern.ch/atlas-opendata/samples/2020/4lep/" ]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  consumer1:
+    image: consumer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - shared_analysis_data:/data
+
+  consumer2:
+    image: consumer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - shared_analysis_data:/data
+
+  consumer3:
+    image: consumer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - shared_analysis_data:/data
+
+  consumer4:
+    image: consumer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - shared_analysis_data:/data
+
+  drawplot:
+    image: drawplot
+    volumes:
+      - shared_analysis_data:/data
+      - plot:/plot
+
+  webserver:
+    image: nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - plot:/usr/share/nginx/html
+    depends_on:
+      - drawplot
+
+volumes:
+  shared_analysis_data:
+  plot:

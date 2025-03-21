@@ -1,0 +1,197 @@
+# RabbitMQ and service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management  # 带有管理界面的版本
+          ports:
+            - containerPort: 5672  # AMQP 端口，Producer/Consumer 连接
+            - containerPort: 15672 # 管理界面端口
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "guest"
+            - name: RABBITMQ_DEFAULT_PASS
+              value: "guest"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672  # AMQP 端口
+      targetPort: 5672
+    - name: management
+      port: 15672  # Web 管理界面端口
+      targetPort: 15672
+
+---
+# Web Server Deployment (Nginx)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webserver
+  template:
+    metadata:
+      labels:
+        app: webserver
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          volumeMounts:
+            - name: plot-storage
+              mountPath: /usr/share/nginx/html
+          ports:
+            - containerPort: 80
+      volumes:
+        - name: plot-storage
+          persistentVolumeClaim:
+            claimName: pvc-plot
+---
+# Web Server Service (NodePort)
+apiVersion: v1
+kind: Service
+metadata:
+  name: webserver-service
+spec:
+  selector:
+    app: webserver
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 80
+  type: NodePort
+---
+# Producer Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      containers:
+      - name: producer
+        image: producer
+        imagePullPolicy: Never
+        env:
+          - name: RABBITMQ_HOST
+            value: "rabbitmq"  
+          - name: RABBITMQ_PORT
+            value: "5672"
+        command: ["python3", "/producer.py", "https://atlas-opendata.web.cern.ch/atlas-opendata/samples/2020/4lep/"]
+---
+# Consumer Deployment 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: consumer
+  template:
+    metadata:
+      labels:
+        app: consumer
+    spec:
+      containers:
+        - name: consumer
+          image: consumer
+          imagePullPolicy: Never
+          env:
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"  
+            - name: RABBITMQ_PORT
+              value: "5672"
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /data
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: pvc-analysis-data
+---
+# DrawPlot Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drawplot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drawplot
+  template:
+    metadata:
+      labels:
+        app: drawplot
+    spec:
+      containers:
+        - name: drawplot
+          image: drawplot
+          imagePullPolicy: Never
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /data
+            - name: plot-storage
+              mountPath: /plot
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: pvc-analysis-data
+        - name: plot-storage
+          persistentVolumeClaim:
+            claimName: pvc-plot
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: consumer-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: consumer  
+  minReplicas: 4  
+  maxReplicas: 10  
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+
+
+
+

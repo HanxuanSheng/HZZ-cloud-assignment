@@ -1,0 +1,9 @@
+FROM python:latest
+
+ADD consumer-analysisdata.py ./
+COPY infofile.py ./
+
+RUN pip install --no-cache-dir pika uproot awkward vector numpy matplotlib
+RUN pip install requests aiohttp
+
+CMD ["python","./consumer-analysisdata.py"]
